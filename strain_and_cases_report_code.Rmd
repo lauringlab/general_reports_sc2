@@ -12,7 +12,7 @@ knitr::opts_chunk$set(warning = FALSE)
 ```
 
 
-Cases data pulled from the State of Michigan's publicly available data. 
+Case data pulled from the State of Michigan's publicly available data. 
 
 Cases include confirmed + probable cases, exclude correctional facilities. Cases are grouped into weeks by onset date. 
 
@@ -108,16 +108,16 @@ Negative control rows and CDC IVY samples removed from full sample list.
 ### sorting out case data
 
 # washtenaw county
-washtenaw_cases <- filter(case_data, COUNTY == "Washtenaw")
-
-washtenaw_cases$week <- epiweek(washtenaw_cases$Date)
-washtenaw_cases$week <- ifelse(nchar(as.character(washtenaw_cases$week)) == 1, paste0("0", as.character(washtenaw_cases$week)), as.character(washtenaw_cases$week)) 
-
-washtenaw_cases$year <- year(washtenaw_cases$Date)
-
-#washtenaw_cases$chart_date <- paste0(washtenaw_cases$year, "-", washtenaw_cases$week)
-
-washtenaw_cases <- washtenaw_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
+# washtenaw_cases <- filter(case_data, COUNTY == "Washtenaw")
+# 
+# washtenaw_cases$week <- epiweek(washtenaw_cases$Date)
+# washtenaw_cases$week <- ifelse(nchar(as.character(washtenaw_cases$week)) == 1, paste0("0", as.character(washtenaw_cases$week)), as.character(washtenaw_cases$week)) 
+# 
+# washtenaw_cases$year <- year(washtenaw_cases$Date)
+# 
+# #washtenaw_cases$chart_date <- paste0(washtenaw_cases$year, "-", washtenaw_cases$week)
+# 
+# washtenaw_cases <- washtenaw_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
 
 #PH region 2s = monroe, washtenaw, wayne (+ detroit city)
 ph_region_2s_cases <- filter(case_data, COUNTY %in% c("Washtenaw", "Monroe", "Wayne", "Detroit City"))
@@ -127,23 +127,31 @@ ph_region_2s_cases$week <- ifelse(nchar(as.character(ph_region_2s_cases$week)) =
 
 ph_region_2s_cases$year <- year(ph_region_2s_cases$Date)
 
+ph_region_2s_cases <- ph_region_2s_cases %>% mutate(week = case_when(week == "53" & year == "2021" ~ "01", 
+                                                     week == "52" & year == "2022" ~ "01",
+                         T ~ week))
+
 #ph_region_2s_cases$chart_date <- paste0(ph_region_2s_cases$year, "-", ph_region_2s_cases$week)
 
 ph_region_2s_cases <- ph_region_2s_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
 
+# ggplot(ph_region_2s_cases, aes(x = week, y = case_cases)) + 
+#   geom_bar(stat = "identity") + 
+#   facet_wrap(.~year)
+
 colnames(ph_region_2s_cases) <- c("year", "week", "ph_2s_cases")
 
 # full state = no MDOC, no out of state
-michigan_cases <- filter(case_data, COUNTY != "MDOC" & COUNTY != "Out-of-State")
-
-michigan_cases$week <- epiweek(as_date(michigan_cases$Date))
-michigan_cases$week <- ifelse(nchar(as.character(michigan_cases$week)) == 1, paste0("0", as.character(michigan_cases$week)), as.character(michigan_cases$week)) 
-
-michigan_cases$year <- year(as_date(michigan_cases$Date))
-
-#michigan_cases$chart_date <- paste0(michigan_cases$year, "-", michigan_cases$week)
-
-michigan_cases <- michigan_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
+# michigan_cases <- filter(case_data, COUNTY != "MDOC" & COUNTY != "Out-of-State")
+# 
+# michigan_cases$week <- epiweek(as_date(michigan_cases$Date))
+# michigan_cases$week <- ifelse(nchar(as.character(michigan_cases$week)) == 1, paste0("0", as.character(michigan_cases$week)), as.character(michigan_cases$week)) 
+# 
+# michigan_cases$year <- year(as_date(michigan_cases$Date))
+# 
+# #michigan_cases$chart_date <- paste0(michigan_cases$year, "-", michigan_cases$week)
+# 
+# michigan_cases <- michigan_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
 
 
 ```
