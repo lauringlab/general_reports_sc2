@@ -36,22 +36,7 @@ source("save_paths.R")
 ```{r}
 #### This section pulls the most recent case and death data from the state of michigan
 
-# reads the html of the state website
-state_page <- read_html("https://www.michigan.gov/coronavirus/0,9753,7-406-98163_98173---,00.html")
-
-state_a <- html_nodes(state_page, "a") # gets all the "a" types
-
-get_doc_url <- as.character(state_a[[91]]) # 88 is the part with the file name we care about
-
-# this section pulls out that URL to use in the file pull
-get_doc_url <- strsplit(get_doc_url, ".xlsx")[[1]][1] 
-get_doc_url <- strsplit(get_doc_url, ".href=")[[1]][2]
-doc_url <- substr(get_doc_url, 2, nchar(get_doc_url))
-                                   
-# pulls the data down from the website 
-url <- paste0("https://www.michigan.gov", doc_url, ".xlsx")
-savefile <- paste0(folder_path, "/Cases_And_Deaths_", substr(basename(doc_url), 76, nchar(basename(doc_url))), ".xlsx")
-download.file(url, savefile, mode = "wb")
+source("pull_cases_from_michigan_website.R")
 
 ```
 
