@@ -1,7 +1,7 @@
 ---
 title: "Strain Vs. Cases (COVID-19)"
-author: "Julie Gilbert"
-date: "7/14/2021"
+author: ""
+date: ""
 output: html_document
 ---
 
@@ -36,12 +36,14 @@ source("save_paths.R")
 ```{r}
 #### This section pulls the most recent case and death data from the state of michigan
 
-source("pull_cases_from_michigan_website.R")
+if (file.exists(paste0(output_filepath, "cases_deaths_by_county_state_of_michigan_", gsub("-", "", Sys.Date()), ".csv"))){
+  x <- 0
+} else {
+  source("pull_cases_from_michigan_website.R")
+}
 
 ```
 
-
-File name that case data is pulled from: `r paste0(basename(doc_url), ".xlsx")`
 
 ```{r}
 
@@ -94,7 +96,7 @@ data_file <- data_file %>% mutate(strain_name = case_when(pangolin_lineage == "B
 
 #data_file <- merge(data_file, who_cw, by.x = c("pangolin_lineage"), by.y = c("pango_lineage"), all.x = TRUE)
 
-case_data <- read.csv(new_file_name_and_loc)
+case_data <- read.csv(paste0(output_filepath, "cases_deaths_by_county_state_of_michigan_", gsub("-", "", Sys.Date()), ".csv"))
 
 ```
 
@@ -199,9 +201,9 @@ strain_totals90 <- merge(strain_totals90, totals90, by = c("collection_year", "c
 
 ###########################################
 
-strain_totals <- data_file %>% group_by(collection_year, collection_week, strain_name) %>% summarize(strain_count = sum(counter, na.rm = TRUE))
+strain_totals <- filter(data_file, !is.na(coll_date) & as.character(coll_date) != "" & nextclade_completeness > 80 & pangolin_status == "passed_qc" & nextclade_qcOverallStatus %in% c("good", "mediocre")) %>% group_by(collection_year, collection_week, strain_name) %>% summarize(strain_count = sum(counter, na.rm = TRUE))
 
-totals <- data_file %>% group_by(collection_year, collection_week) %>% summarize(total = sum(counter, na.rm = TRUE))
+totals <- filter(data_file, !is.na(coll_date) & as.character(coll_date) != "" & as.numeric(nextclade_completeness) > 80 & pangolin_status == "passed_qc" & nextclade_qcOverallStatus %in% c("good", "mediocre")) %>% group_by(collection_year, collection_week) %>% summarize(total = sum(counter, na.rm = TRUE))
 
 
 strain_totals <- merge(strain_totals, totals, by = c("collection_year", "collection_week"), all = TRUE)
@@ -263,11 +265,12 @@ ggplot(strain_totals) +
 #### Table of Most Recent 50 Samples
 
 Ordered samples by collection date, most recent 50 samples selected.
-Only samples with > 90% nextclade completeness shown
+Only samples with > 80% nextclade completeness shown and pangolin qc == passed and 
+nextclade qc == mediocre or good.
 
 ```{r}
 
-data_file_order <- filter(data_file, !is.na(coll_date) & nextclade_completeness > 90) %>% arrange(coll_date)
+data_file_order <- filter(data_file, !is.na(coll_date) & as.character(coll_date) != "" & nextclade_completeness > 80 & pangolin_status == "passed_qc" & nextclade_qcOverallStatus %in% c("good", "mediocre")) %>% arrange(coll_date)
 data_file_50 <- tail(data_file_order, 50)
 
 df50 <- as.data.frame(table(data_file_50$nextclade_clade, data_file_50$pangolin_lineage, useNA = "always"))
@@ -284,73 +287,4 @@ df50 %>%
   ) 
 ```
 
-
----
-
-#### Charts - Sequences with >= 90% Completeness
-
-
-```{r, fig.height = 8, fig.width = 10}
-
-strain_totals90 <- merge(strain_totals90, ph_region_2s_cases, by.x = c("chart_collection_date"), by.y = c("chart_date"), all.x = TRUE)
-
-# turn this to cases per 100,000 population
-strain_totals90$ph_2s_cases_per100 <- round((strain_totals90$ph_2s_cases / 2267443) * 100000, 1)
-
-ggplot(strain_totals90) + 
-  geom_bar(stat = "identity", aes(x = as.character(chart_collection_date), y = strain_count, fill = WHO_LABEL)) + 
-  geom_line(data = strain_totals90, aes(x = as.character(chart_collection_date), y = ph_2s_cases_per100), color = "black", group = 1, alpha = 0.6, size = 1) +
-  theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
-  scale_fill_manual(values = c("#F2929A", "#92817A", "#1C3041", "#0BC18A", 
-                               "#006989", "#FF6663", "#85D4FF", "#ACB0BD", "#48BEFF")) + 
-  labs(title = "Samples Collected per Week", 
-       subtitle = "Colored by WHO Label", 
-       x = "Collection Week", 
-       y = "Count", 
-       fill = "WHO Label", 
-       caption = "Black line = New Cases per 100,000 population in Public Health Region 2S") 
-
-
-```
-
-```{r, fig.height = 8, fig.width = 10}
-
-strain_totals90$proportion <- round((strain_totals90$strain_count / strain_totals90$total)*100, 1)
-
-ggplot(strain_totals90) + 
-  geom_bar(stat = "identity", aes(x = as.character(chart_collection_date), y = proportion, fill = WHO_LABEL)) + 
-  geom_line(data = strain_totals90, aes(x = as.character(chart_collection_date), y = ph_2s_cases_per100/4), color = "black", group = 1, alpha = 0.6, size = 1) +
-  theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
-  scale_fill_manual(values = c("#F2929A", "#92817A", "#1C3041", "#0BC18A", 
-                               "#006989", "#FF6663", "#85D4FF", "#ACB0BD", "#48BEFF")) + 
-  labs(title = "Samples Collected per Week - Proportions of Each Strain", 
-       subtitle = "Colored by WHO Label", 
-       x = "Collection Week", 
-       y = "Proportion (%)", 
-       fill = "WHO Label", 
-       caption = "Black line = New Cases per 100,000 population in Public Health Region 2S divided by 4") 
-
-```
-
-
-```{r}
-data_file_order <- filter(data_file90, !is.na(coll_date)) %>% arrange(coll_date)
-data_file_90_50 <- tail(data_file_order, 50)
-
-df90_50 <- as.data.frame(table(data_file_90_50$nextclade_clade.x, data_file_90_50$pangolin_lineage, useNA = "always"))
-
-colnames(df90_50) <- c("NextClade", "Pangolin", "Count")
-df90_50 <- filter(df90_50, Count != 0)
-df90_50 <- df90_50 %>% arrange(desc(Count))
-
-df90_50 %>% 
-  gt() %>% 
-  tab_header(
-    title = "Most Recent 50 Samples",
-    subtitle = paste0("Collected ", min(data_file_90_50$coll_date), " to ", max(data_file_90_50$coll_date))
-  ) 
-
-```
 
