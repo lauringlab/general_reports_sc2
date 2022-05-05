@@ -59,11 +59,15 @@ data_file <- filter(data_file, !received_source %in% c("CDCIVY", "CDCIVY4", "RVT
 
 ### add overarching strain name based on pangolin lineage
 data_file <- data_file %>% mutate(pangolin_lineage = trimws(pangolin_lineage))
-data_file <- data_file %>% mutate(strain_name = case_when(grepl("BA.", pangolin_lineage) ~ "Omicron", 
-                                                          pangolin_lineage == "B.1.1.529" ~ "Omicron", 
+data_file <- data_file %>% mutate(strain_name = case_when(pangolin_lineage == "B.1.1.529" ~ "Omicron",
+                                                          grepl("BA.1", pangolin_lineage) ~ "Omicron BA.1 Type", 
+                                                          grepl("BA.2", pangolin_lineage) ~ "Omicron BA.2 Type", 
+                                                          grepl("BA.3", pangolin_lineage) ~ "Omicron BA.3 Type", 
+                                                          grepl("BA.4", pangolin_lineage) ~ "Omicron BA.4 Type", 
+                                                          grepl("BA.5", pangolin_lineage) ~ "Omicron BA.5 Type", 
                                                           grepl("AY.", pangolin_lineage) ~ "Delta", 
                                                           pangolin_lineage == "B.1.617.2" ~ "Delta", 
-                                                          pangolin_lineage == "B.1.1.7 " ~ "Alpha", 
+                                                          pangolin_lineage == "B.1.1.7" ~ "Alpha", 
                                                           grepl("Q.", pangolin_lineage) ~ "Alpha",
                                                           pangolin_lineage == "B.1.351" ~ "Beta", 
                                                           pangolin_lineage == "P.1" ~ "Gamma", 
@@ -109,9 +113,9 @@ washtenaw_cases$week <- ifelse(nchar(as.character(washtenaw_cases$week)) == 1, p
 
 washtenaw_cases$year <- year(washtenaw_cases$Date)
 
-washtenaw_cases$chart_date <- paste0(washtenaw_cases$year, "-", washtenaw_cases$week)
+#washtenaw_cases$chart_date <- paste0(washtenaw_cases$year, "-", washtenaw_cases$week)
 
-washtenaw_cases <- washtenaw_cases %>% group_by(chart_date) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
+washtenaw_cases <- washtenaw_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
 
 #PH region 2s = monroe, washtenaw, wayne (+ detroit city)
 ph_region_2s_cases <- filter(case_data, COUNTY %in% c("Washtenaw", "Monroe", "Wayne", "Detroit City"))
@@ -121,23 +125,23 @@ ph_region_2s_cases$week <- ifelse(nchar(as.character(ph_region_2s_cases$week)) =
 
 ph_region_2s_cases$year <- year(ph_region_2s_cases$Date)
 
-ph_region_2s_cases$chart_date <- paste0(ph_region_2s_cases$year, "-", ph_region_2s_cases$week)
+#ph_region_2s_cases$chart_date <- paste0(ph_region_2s_cases$year, "-", ph_region_2s_cases$week)
 
-ph_region_2s_cases <- ph_region_2s_cases %>% group_by(chart_date) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
+ph_region_2s_cases <- ph_region_2s_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
 
-colnames(ph_region_2s_cases) <- c("chart_date", "ph_2s_cases")
+colnames(ph_region_2s_cases) <- c("year", "week", "ph_2s_cases")
 
 # full state = no MDOC, no out of state
 michigan_cases <- filter(case_data, COUNTY != "MDOC" & COUNTY != "Out-of-State")
 
-michigan_cases$week <- epiweek(michigan_cases$Date)
+michigan_cases$week <- epiweek(as_date(michigan_cases$Date))
 michigan_cases$week <- ifelse(nchar(as.character(michigan_cases$week)) == 1, paste0("0", as.character(michigan_cases$week)), as.character(michigan_cases$week)) 
 
-michigan_cases$year <- year(michigan_cases$Date)
+michigan_cases$year <- year(as_date(michigan_cases$Date))
 
-michigan_cases$chart_date <- paste0(michigan_cases$year, "-", michigan_cases$week)
+#michigan_cases$chart_date <- paste0(michigan_cases$year, "-", michigan_cases$week)
 
-michigan_cases <- michigan_cases %>% group_by(chart_date) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
+michigan_cases <- michigan_cases %>% group_by(year, week) %>% summarize(case_cases = sum(Cases, na.rm = TRUE))
 
 
 ```
@@ -152,7 +156,7 @@ Detroit City: 670052
 PH Region 2S = 2267443
 
 ```{r}
-data_file$WHO_LABEL <- ifelse(is.na(data_file$WHO_LABEL), "Not VOI/VOC", data_file$WHO_LABEL)
+#data_file$WHO_LABEL <- ifelse(is.na(data_file$WHO_LABEL), "Not VOI/VOC", data_file$WHO_LABEL)
 
 data_file$counter <- 1
 
@@ -166,35 +170,41 @@ data_file$collection_week <- ifelse(nchar(as.character(data_file$collection_week
 data_file$collection_year <- year(data_file$coll_date)
 
 # week is counting last week of 2020 as week "53"
-data_file$collection_week <- ifelse(data_file$collection_week == "53" & data_file$collection_year == 2021, "01", data_file$collection_week)
+### adjust years and weeks
+data_file <- data_file %>% mutate(collection_week = case_when(collection_week == "53" 
+                                                     & collection_year == "2021" ~ "01", 
+                                                     collection_week == "52" 
+                                                     & collection_year == "2022" ~ "01",
+                         T ~ collection_week))
 
 # filter out everything that is from 2020
 data_file <- filter(data_file, collection_year != 2020)
 
-data_file$chart_collection_date <- paste0(data_file$collection_year, "-", data_file$collection_week)
+#data_file$chart_collection_date <- paste0(data_file$collection_year, "-", data_file$collection_week)
 
 
 ###########################################
 
 data_file90 <- filter(data_file, nextclade_completeness >= 90)
 
-strain_totals90 <- data_file90 %>% group_by(chart_collection_date, WHO_LABEL, pangolin_lineage) %>% summarize(strain_count = sum(counter, na.rm = TRUE))
+strain_totals90 <- data_file90 %>% group_by(collection_year, collection_week, strain_name) %>% summarize(strain_count = sum(counter, na.rm = TRUE))
 
-totals90 <- data_file90 %>% group_by(chart_collection_date) %>% summarize(total = sum(counter, na.rm = TRUE))
+totals90 <- data_file90 %>% group_by(collection_year, collection_week) %>% summarize(total = sum(counter, na.rm = TRUE))
 
 
-strain_totals90 <- merge(strain_totals90, totals90, by = c("chart_collection_date"), all = TRUE)
+strain_totals90 <- merge(strain_totals90, totals90, by = c("collection_year", "collection_week"), all = TRUE)
+
 
 
 
 ###########################################
 
-strain_totals <- data_file %>% group_by(chart_collection_date, WHO_LABEL, pangolin_lineage) %>% summarize(strain_count = sum(counter, na.rm = TRUE))
+strain_totals <- data_file %>% group_by(collection_year, collection_week, strain_name) %>% summarize(strain_count = sum(counter, na.rm = TRUE))
 
-totals <- data_file %>% group_by(chart_collection_date) %>% summarize(total = sum(counter, na.rm = TRUE))
+totals <- data_file %>% group_by(collection_year, collection_week) %>% summarize(total = sum(counter, na.rm = TRUE))
 
 
-strain_totals <- merge(strain_totals, totals, by = c("chart_collection_date"), all = TRUE)
+strain_totals <- merge(strain_totals, totals, by = c("collection_year", "collection_week"), all = TRUE)
 
 ```
 
@@ -203,24 +213,27 @@ strain_totals <- merge(strain_totals, totals, by = c("chart_collection_date"), a
 
 ```{r, fig.height = 8, fig.width = 10}
 
-strain_totals <- merge(strain_totals, ph_region_2s_cases, by.x = c("chart_collection_date"), by.y = c("chart_date"), all.x = TRUE)
+strain_totals <- merge(strain_totals, ph_region_2s_cases, by.x = c("collection_year", "collection_week"), by.y = c("year", "week"), all.x = TRUE)
 
 # turn this to cases per 100,000 population
 strain_totals$ph_2s_cases_per100 <- round((strain_totals$ph_2s_cases / 2267443) * 100000, 1)
 
 ggplot(strain_totals) + 
-  geom_bar(stat = "identity", aes(x = as.character(chart_collection_date), y = strain_count, fill = WHO_LABEL)) + 
-  geom_line(data = strain_totals, aes(x = as.character(chart_collection_date), y = ph_2s_cases_per100), color = "black", group = 1, alpha = 0.6, size = 1) +
+  geom_bar(stat = "identity", aes(x = collection_week, y = strain_count, fill = strain_name)) + 
+  geom_line(data = strain_totals, aes(x = collection_week, y = ph_2s_cases_per100), color = "black", group = 1, alpha = 0.6, size = 1) +
   theme_bw() + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
-  scale_fill_manual(values = c("#F2929A", "#92817A", "#1C3041", "#0BC18A", 
-                               "#006989", "#FF6663", "#85D4FF", "#ACB0BD", "#48BEFF")) + 
+  scale_fill_manual(values = c("#F2929A", "#392061", "#92817A", "#1C3041", "#0BC18A", 
+                               "#006989", "#ACB0BD", "#FF6663", "#85D4FF",  
+                               "#87C38F", "#48BEFF", "#AA6373", "#F0F2A6", 
+                               "#DA7422", "#62466B", "#FCEFF9")) + 
   labs(title = "Samples Collected per Week", 
-       subtitle = "Colored by WHO Label", 
+       subtitle = "Colored by Lineage Name", 
        x = "Collection Week", 
        y = "Count", 
-       fill = "WHO Label", 
-       caption = "Black line = New Cases per 100,000 population in Public Health Region 2S") 
+       fill = "Lineage Name", 
+       caption = "Black line = New Cases per 100,000 population in Public Health Region 2S") + 
+  facet_wrap(.~collection_year, ncol = 1)
 
 ```
 
@@ -229,31 +242,35 @@ ggplot(strain_totals) +
 strain_totals$proportion <- round((strain_totals$strain_count / strain_totals$total)*100, 1)
 
 ggplot(strain_totals) + 
-  geom_bar(stat = "identity", aes(x = as.character(chart_collection_date), y = proportion, fill = WHO_LABEL)) + 
-  geom_line(data = strain_totals, aes(x = as.character(chart_collection_date), y = ph_2s_cases_per100/4), color = "black", group = 1, alpha = 0.6, size = 1) +
+  geom_bar(stat = "identity", aes(x = collection_week, y = proportion, fill = strain_name)) + 
+  geom_line(data = strain_totals, aes(x = collection_week, y = ph_2s_cases_per100/10), color = "gray40", group = 1, alpha = 0.6, size = 2) +
   theme_bw() + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
-  scale_fill_manual(values = c("#F2929A", "#92817A", "#1C3041", "#0BC18A", 
-                               "#006989", "#FF6663", "#85D4FF", "#ACB0BD", "#48BEFF")) + 
+  scale_fill_manual(values = c("#F2929A", "#392061", "#92817A", "#1C3041", "#0BC18A", 
+                               "#006989", "#ACB0BD", "#FF6663", "#85D4FF",  
+                               "#87C38F", "#48BEFF", "#AA6373", "#F0F2A6", 
+                               "#DA7422", "#62466B", "#FCEFF9")) +  
   labs(title = "Samples Collected per Week - Proportions of Each Strain", 
-       subtitle = "Colored by WHO Label", 
+       subtitle = "Colored by Lineage Name", 
        x = "Collection Week", 
        y = "Proportion (%)", 
-       fill = "WHO Label", 
-       caption = "Black line = New Cases per 100,000 population in Public Health Region 2S divided by 4") 
+       fill = "Lineage Name", 
+       caption = "Gray line = New Cases per 100,000 population in Public Health Region 2S divided by 10") + 
+  facet_wrap(.~collection_year, ncol = 1)
 
 ```
 
 #### Table of Most Recent 50 Samples
 
 Ordered samples by collection date, most recent 50 samples selected.
+Only samples with > 90% nextclade completeness shown
 
 ```{r}
 
-data_file_order <- filter(data_file, !is.na(coll_date)) %>% arrange(coll_date)
+data_file_order <- filter(data_file, !is.na(coll_date) & nextclade_completeness > 90) %>% arrange(coll_date)
 data_file_50 <- tail(data_file_order, 50)
 
-df50 <- as.data.frame(table(data_file_50$nextclade_clade.x, data_file_50$pangolin_lineage, useNA = "always"))
+df50 <- as.data.frame(table(data_file_50$nextclade_clade, data_file_50$pangolin_lineage, useNA = "always"))
 
 colnames(df50) <- c("NextClade", "Pangolin", "Count")
 df50 <- filter(df50, Count != 0)
