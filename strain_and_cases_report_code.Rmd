@@ -46,24 +46,55 @@ File name that case data is pulled from: `r paste0(basename(doc_url), ".xlsx")`
 ```{r}
 
 ### read in genomic sequencing data results
+data_file <- data_file_source
+
 
 # filter out anything that suggests a negative control
-data_file <- filter(data_file, !grepl("Negat", SampleSourceLocation))
+data_file <- filter(data_file, !grepl("Negat", SampleSourceLocation) & !grepl("HeLa", sample_id) & !grepl("NC_", sample_id))
 
-# filter out CDC IVY samples 
-data_file <- filter(data_file, received_source != "CDCIVY")
+# filter out non-michigan based project sources
+data_file <- filter(data_file, !received_source %in% c("CDCIVY", "CDCIVY4", "RVTN", "BSL3"))
 
-who_cw <- read.csv("/who_variant_crosswalk.csv")
+#who_cw <- read.csv("/who_variant_crosswalk.csv")
 
-data_file <- merge(data_file, who_cw, by.x = c("pangolin_lineage"), by.y = c("pango_lineage"), all.x = TRUE)
+### add overarching strain name based on pangolin lineage
+data_file <- data_file %>% mutate(pangolin_lineage = trimws(pangolin_lineage))
+data_file <- data_file %>% mutate(strain_name = case_when(grepl("BA.", pangolin_lineage) ~ "Omicron", 
+                                                          pangolin_lineage == "B.1.1.529" ~ "Omicron", 
+                                                          grepl("AY.", pangolin_lineage) ~ "Delta", 
+                                                          pangolin_lineage == "B.1.617.2" ~ "Delta", 
+                                                          pangolin_lineage == "B.1.1.7 " ~ "Alpha", 
+                                                          grepl("Q.", pangolin_lineage) ~ "Alpha",
+                                                          pangolin_lineage == "B.1.351" ~ "Beta", 
+                                                          pangolin_lineage == "P.1" ~ "Gamma", 
+                                                          pangolin_lineage == "B.1.427" ~ "Epsilon",
+                                                          pangolin_lineage == "B.1.429" ~ "Epsilon",
+                                                          pangolin_lineage == "B.1.525" ~ "Eta",
+                                                          pangolin_lineage == "B.1.526" ~ "Iota",
+                                                          pangolin_lineage == "B.1.617.1" ~ "Kappa",
+                                                          pangolin_lineage == "B.1.621" ~ "Mu",
+                                                          pangolin_lineage == "B.1.621.1" ~ "Mu",
+                                                          pangolin_lineage == "P.2" ~ "Zeta",
+                                                          grepl("B.", pangolin_lineage) ~ "Original B", 
+                                                          pangolin_lineage == "B" ~ "Original B",
+                                                          pangolin_lineage == "D.2" ~ "Original B",
+                                                          pangolin_lineage == "R.1" ~ "Original B",
+                                                          pangolin_lineage == "C.37" ~ "Original B",
+                                                          grepl("A.", pangolin_lineage) ~ "Original A",
+                                                          pangolin_lineage == "A" ~ "Original A",
+                                                          pangolin_lineage == "" ~ "No Call",
+                                                          pangolin_lineage == "None" ~ "No Call",
+                                                          pangolin_lineage == "Unassigned" ~ "No Call",
+                                                          T ~ "Unknown"))
 
-case_data <- read.xlsx(paste0(folder_path, "/Cases_And_Deaths_", substr(basename(doc_url), 76, nchar(basename(doc_url))), ".xlsx"), detectDates = TRUE)
+
+#data_file <- merge(data_file, who_cw, by.x = c("pangolin_lineage"), by.y = c("pango_lineage"), all.x = TRUE)
+
+case_data <- read.csv(new_file_name_and_loc)
+
 ```
 
 Negative control rows and CDC IVY samples removed from full sample list. 
-Full sample list matched to WHO variants list on pangolin lineage. 
-
-WHO denoted VOIs and VOCs last updated on `r unique(who_cw$update_date)`.
 
 
 ```{r}
